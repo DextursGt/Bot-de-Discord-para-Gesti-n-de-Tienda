@@ -1,8 +1,10 @@
+# Importamos las librerías necesarias para la tienda virtual
 import discord
 from discord.ext import commands
 from discord import ui
 from typing import List, Dict, Optional
 import logging
+# Traemos los módulos de la tienda y economía
 from virtual_shop import virtual_shop
 from data_manager import load_data, save_data
 from economy_system import EconomySystem
@@ -11,58 +13,59 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class VirtualShopView(discord.ui.View):
-    """Vista principal de la tienda virtual"""
+    """Vista principal de la tienda virtual donde los usuarios pueden navegar y comprar productos"""
     
     def __init__(self, user_id: int, timeout: float = 300):
         super().__init__(timeout=timeout)
-        self.user_id = user_id
-        self.current_category = "all"
-        self.current_page = 0
-        self.products_per_page = 5
+        self.user_id = user_id  # ID del usuario que abrió la tienda
+        self.current_category = "all"  # Categoría actual seleccionada
+        self.current_page = 0  # Página actual de productos
+        self.products_per_page = 5  # Cantidad de productos por página
     
     async def on_timeout(self):
-        """Deshabilita los botones cuando expira el tiempo"""
+        """Deshabilita todos los botones cuando la vista expira por tiempo"""
         for item in self.children:
-            item.disabled = True
+            item.disabled = True  # Deshabilitamos todos los controles
         
         try:
-            await self.message.edit(view=self)
+            await self.message.edit(view=self)  # Intentamos actualizar la vista
         except:
-            pass
+            pass  # Ignoramos errores si el mensaje ya no existe
     
     def get_filtered_products(self):
-        """Obtiene productos filtrados por categoría"""
+        """Filtra los productos según la categoría seleccionada"""
         all_products = virtual_shop.get_virtual_products()
         
-        # Filtrar solo productos habilitados
+        # Filtramos solo productos habilitados
         enabled_products = {k: v for k, v in all_products.items() if v.get('enabled', True)}
         
         if self.current_category == "all":
-            return enabled_products
+            return enabled_products  # Devolvemos todos los productos
         
+        # Filtramos por categoría específica
         return {k: v for k, v in enabled_products.items() if v.get('category') == self.current_category}
     
     def create_shop_embed(self):
-        """Crea el embed principal de la tienda"""
+        """Crea el embed principal que muestra los productos de la tienda"""
         economy = EconomySystem()
-        user_coins = economy.get_balance(str(self.user_id))
+        user_coins = economy.get_balance(str(self.user_id))  # Obtenemos el balance del usuario
         
-        filtered_products = self.get_filtered_products()
+        filtered_products = self.get_filtered_products()  # Productos filtrados por categoría
         total_products = len(filtered_products)
         
-        # Calcular paginación
+        # Calculamos la paginación de productos
         start_idx = self.current_page * self.products_per_page
         end_idx = start_idx + self.products_per_page
         products_list = list(filtered_products.items())[start_idx:end_idx]
         
-        # Crear embed
+        # Creamos el embed principal de la tienda
         embed = discord.Embed(
             title="🛒 Tienda Virtual de GameCoins",
             description=f"💰 Tus GameCoins: **{user_coins:,}**",
-            color=0x3498db
+            color=0x3498db  # Color azul para la tienda
         )
         
-        # Información de categoría
+        # Información de la categoría actual
         if self.current_category == "all":
             category_name = "📦 Todas las Categorías"
         else:
@@ -75,10 +78,10 @@ class VirtualShopView(discord.ui.View):
             inline=True
         )
         
-        # Información de paginación
+        # Calculamos el número total de páginas
         total_pages = (total_products + self.products_per_page - 1) // self.products_per_page
         if total_pages == 0:
-            total_pages = 1
+            total_pages = 1  # Mínimo una página
         
         embed.add_field(
             name="📄 Página",
@@ -92,7 +95,7 @@ class VirtualShopView(discord.ui.View):
             inline=True
         )
         
-        # Mostrar productos
+        # Mostramos los productos en el embed
         if not products_list:
             embed.add_field(
                 name="🚫 Sin Productos",
@@ -101,13 +104,13 @@ class VirtualShopView(discord.ui.View):
             )
         else:
             for i, (product_id, product) in enumerate(products_list, 1):
-                # Determinar si el usuario puede comprar
+                # Verificamos si el usuario puede permitirse el producto
                 can_afford = user_coins >= product['price']
                 price_display = f"💰 **{product['price']:,}** GameCoins"
                 if not can_afford:
-                    price_display += " ❌"
+                    price_display += " ❌"  # Indicamos que no puede comprarlo
                 
-                # Información adicional
+                # Agregamos información adicional del producto
                 extra_info = []
                 if product.get('role_id'):
                     extra_info.append("🎭 Incluye rol")
@@ -117,7 +120,7 @@ class VirtualShopView(discord.ui.View):
                 value = f"{price_display}\n📝 {product['description']}"
                 if extra_info:
                     value += f"\n{' • '.join(extra_info)}"
-                value += f"\n🆔 `{product_id}`"
+                value += f"\n🆔 `{product_id}`"  # ID del producto
                 
                 embed.add_field(
                     name=f"{start_idx + i}. {product['name']}",
@@ -129,16 +132,16 @@ class VirtualShopView(discord.ui.View):
         return embed
     
     def update_buttons(self):
-        """Actualiza el estado de los botones"""
+        """Actualiza el estado de habilitación de los botones según el contexto"""
         filtered_products = self.get_filtered_products()
         total_products = len(filtered_products)
         total_pages = max(1, (total_products + self.products_per_page - 1) // self.products_per_page)
         
-        # Botones de navegación
+        # Controlamos la navegación entre páginas
         self.previous_page.disabled = self.current_page == 0
         self.next_page.disabled = self.current_page >= total_pages - 1
         
-        # Botón de compra
+        # El botón de compra solo está disponible si hay productos
         self.buy_product.disabled = total_products == 0
     
     @discord.ui.select(
@@ -153,13 +156,13 @@ class VirtualShopView(discord.ui.View):
         ]
     )
     async def category_select(self, interaction: discord.Interaction, select: discord.ui.Select):
-        """Maneja la selección de categoría"""
+        """Maneja el cambio de categoría seleccionada por el usuario"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ Solo quien abrió la tienda puede usarla.", ephemeral=True)
             return
         
         self.current_category = select.values[0]
-        self.current_page = 0  # Resetear página al cambiar categoría
+        self.current_page = 0  # Reinicia a la primera página
         
         self.update_buttons()
         embed = self.create_shop_embed()
@@ -168,7 +171,7 @@ class VirtualShopView(discord.ui.View):
     
     @discord.ui.button(label="⬅️ Anterior", style=discord.ButtonStyle.secondary)
     async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Página anterior"""
+        """Navega a la página anterior de productos"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ Solo quien abrió la tienda puede usarla.", ephemeral=True)
             return
@@ -183,7 +186,7 @@ class VirtualShopView(discord.ui.View):
     
     @discord.ui.button(label="➡️ Siguiente", style=discord.ButtonStyle.secondary)
     async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Página siguiente"""
+        """Navega a la página siguiente de productos"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ Solo quien abrió la tienda puede usarla.", ephemeral=True)
             return
@@ -201,7 +204,7 @@ class VirtualShopView(discord.ui.View):
     
     @discord.ui.button(label="🛍️ Comprar", style=discord.ButtonStyle.success)
     async def buy_product(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Abre el modal de compra"""
+        """Abre el modal de compra para que el usuario seleccione un producto"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ Solo quien abrió la tienda puede usarla.", ephemeral=True)
             return
@@ -216,7 +219,7 @@ class VirtualShopView(discord.ui.View):
     
     @discord.ui.button(label="🔄 Actualizar", style=discord.ButtonStyle.primary)
     async def refresh_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Actualiza la tienda"""
+        """Actualiza la vista de la tienda con los datos más recientes"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ Solo quien abrió la tienda puede usarla.", ephemeral=True)
             return
@@ -227,7 +230,7 @@ class VirtualShopView(discord.ui.View):
     
     @discord.ui.button(label="❌ Cerrar", style=discord.ButtonStyle.danger)
     async def close_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Cierra la tienda"""
+        """Cierra la interfaz de la tienda virtual"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ Solo quien abrió la tienda puede usarla.", ephemeral=True)
             return
@@ -244,7 +247,7 @@ class VirtualShopView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
 
 class PurchaseModal(discord.ui.Modal):
-    """Modal para realizar compras"""
+    """Modal para que el usuario ingrese el ID del producto a comprar"""
     
     def __init__(self, user_id: int, available_products: dict):
         super().__init__(title="🛍️ Comprar Producto")
@@ -260,20 +263,20 @@ class PurchaseModal(discord.ui.Modal):
         self.add_item(self.product_id)
     
     async def on_submit(self, interaction: discord.Interaction):
-        """Procesa la compra"""
+        """Procesa la compra del producto seleccionado"""
         try:
             await interaction.response.defer()
             
             product_id = self.product_id.value.strip()
             
-            # Verificar que el producto existe y está disponible
+            # Verifica que el producto existe y está disponible
             if product_id not in self.available_products:
                 await interaction.followup.send("❌ Producto no encontrado o no disponible.", ephemeral=True)
                 return
             
             product = self.available_products[product_id]
             
-            # Verificar GameCoins del usuario
+            # Verifica el balance de GameCoins del usuario
             economy = EconomySystem()
             user_coins = economy.get_balance(str(self.user_id))
             
@@ -288,7 +291,7 @@ class PurchaseModal(discord.ui.Modal):
                 )
                 return
             
-            # Procesar compra
+            # Procesa la compra del producto
             purchase_result = virtual_shop.purchase_virtual_product(
                 user_id=str(self.user_id),
                 product_id=product_id,
@@ -296,11 +299,11 @@ class PurchaseModal(discord.ui.Modal):
             )
             
             if purchase_result['success']:
-                # Deducir coins usando el sistema de economía
+                # Deduce las monedas del balance del usuario
                 economy.remove_coins(str(self.user_id), product['price'], f"Compra: {product['name']}")
                 new_balance = economy.get_balance(str(self.user_id))
                 
-                # Otorgar rol si es necesario
+                # Otorga el rol si el producto lo incluye
                 role_granted = False
                 if product.get('role_id') and interaction.guild:
                     try:
@@ -311,7 +314,7 @@ class PurchaseModal(discord.ui.Modal):
                     except Exception as e:
                         logger.error(f"Error al otorgar rol: {e}")
                 
-                # Crear embed de confirmación
+                # Crea el embed de confirmación de compra
                 embed = discord.Embed(
                     title="✅ Compra Exitosa",
                     description=f"¡Has comprado **{product['name']}** exitosamente!",
@@ -337,7 +340,7 @@ class PurchaseModal(discord.ui.Modal):
                 
                 await interaction.followup.send(embed=embed, ephemeral=True)
                 
-                # Log de la compra
+                # Registra la compra en los logs
                 logger.info(f"Usuario {self.user_id} compró {product['name']} por {product['price']} GameCoins")
                 
             else:

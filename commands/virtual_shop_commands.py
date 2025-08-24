@@ -1,7 +1,9 @@
+# Importamos todo lo necesario para manejar los comandos de la tienda virtual 🛍️
 import discord
 from discord import app_commands
 from discord.ext import commands
 import logging
+# Aquí traemos nuestra tienda virtual y las vistas
 from virtual_shop import virtual_shop
 from views.virtual_shop_view import VirtualShopView
 from config import OWNER_ROLE_ID
@@ -9,7 +11,7 @@ from config import OWNER_ROLE_ID
 logger = logging.getLogger(__name__)
 
 def setup(tree: app_commands.CommandTree, client: commands.Bot):
-    """Configura los comandos de la tienda virtual"""
+    """Aquí configuramos todos los comandos geniales de la tienda virtual 🎪"""
     
     def is_owner():
         async def predicate(interaction: discord.Interaction) -> bool:
@@ -18,7 +20,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
                 await interaction.response.send_message("No tienes permisos para ejecutar este comando. Este comando está reservado para Owners.", ephemeral=True)
                 return False
             return True
-        return app_commands.check(predicate)
+        return app_commands.check(predicate)  # Solo los owners pueden usar estos comandos
     
     @tree.command(name="añadir_producto_virtual", description="[OWNER] Añade un producto virtual a la tienda")
     @app_commands.describe(
@@ -41,11 +43,11 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
     async def añadir_producto_virtual(interaction: discord.Interaction, nombre: str, precio: int, 
                                     descripcion: str, categoria: str, imagen_url: str = None, 
                                     rol_id: str = None, duracion_dias: int = None):
-        """Añade un producto virtual a la tienda"""
+        """¡Aquí los owners pueden agregar productos increíbles a la tienda! 🎁"""
         try:
-            await interaction.response.defer()
+            await interaction.response.defer()  # Le decimos a Discord que estamos trabajando
             
-            # Validaciones
+            # Valida los datos del producto antes de agregarlo
             if precio <= 0:
                 await interaction.followup.send("❌ El precio debe ser mayor a 0.", ephemeral=True)
                 return
@@ -58,7 +60,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
                 await interaction.followup.send("❌ La descripción no puede exceder 500 caracteres.", ephemeral=True)
                 return
             
-            # Validar rol si se proporciona
+            # Valida el rol si se proporciona
             role = None
             if rol_id:
                 try:
@@ -70,7 +72,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
                     await interaction.followup.send("❌ ID de rol inválido.", ephemeral=True)
                     return
             
-            # Añadir producto
+            # Agrega el producto a la tienda
             product_id = virtual_shop.add_virtual_product(
                 name=nombre,
                 price=precio,
@@ -81,7 +83,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
                 duration_days=duracion_dias
             )
             
-            # Crear embed de confirmación
+            # Crea el embed de confirmación
             embed = discord.Embed(
                 title="✅ Producto Añadido",
                 description=f"El producto **{nombre}** ha sido añadido exitosamente a la tienda virtual.",
@@ -129,13 +131,13 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
         try:
             await interaction.response.defer()
             
-            # Verificar que el producto existe
+            # Verifica que el producto existe
             products = virtual_shop.get_virtual_products()
             if product_id not in products:
                 await interaction.followup.send("❌ Producto no encontrado.", ephemeral=True)
                 return
             
-            # Preparar datos de actualización
+            # Prepara los datos de actualización
             update_data = {}
             if nombre is not None:
                 if len(nombre) > 100:
@@ -162,7 +164,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
                 await interaction.followup.send("❌ No se especificaron cambios.", ephemeral=True)
                 return
             
-            # Actualizar producto
+            # Actualiza el producto con los nuevos datos
             success = virtual_shop.edit_virtual_product(product_id, **update_data)
             
             if success:
@@ -204,7 +206,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
         try:
             await interaction.response.defer()
             
-            # Verificar que el producto existe
+            # Verifica que el producto existe
             products = virtual_shop.get_virtual_products()
             if product_id not in products:
                 await interaction.followup.send("❌ Producto no encontrado.", ephemeral=True)
@@ -212,7 +214,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
             
             product_name = products[product_id]['name']
             
-            # Eliminar producto
+            # Elimina el producto de la tienda
             success = virtual_shop.remove_virtual_product(product_id)
             
             if success:
@@ -330,7 +332,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
             logger.error(f"Error al listar productos virtuales: {e}")
             await interaction.followup.send("❌ Error al cargar la lista de productos.", ephemeral=True)
     
-    # Autocompletado para IDs de productos
+    # Función de autocompletado para IDs de productos
     @eliminar_producto_virtual.autocomplete('product_id')
     @editar_producto_virtual.autocomplete('product_id')
     async def product_autocomplete(interaction: discord.Interaction, current: str):
@@ -344,7 +346,7 @@ def setup(tree: app_commands.CommandTree, client: commands.Bot):
                     value=product_id
                 ))
                 
-                if len(choices) >= 25:  # Discord limit
+                if len(choices) >= 25:  # Límite de Discord
                     break
         
         return choices
