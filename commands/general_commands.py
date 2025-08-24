@@ -155,8 +155,9 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
         )
         
         # Comandos de Owner (solo visible para owners)
-        from utils import OWNER_IDS
-        if str(interaction.user.id) in OWNER_IDS:
+        from config import OWNER_ROLE_ID
+        owner_role = discord.utils.get(interaction.user.roles, id=OWNER_ROLE_ID)
+        if owner_role is not None:
             embed.add_field(
                 name="👑 Comandos de Owner",
                 value="`/add_gamecoins` - Añadir GameCoins a un usuario\n"
