@@ -10,7 +10,10 @@ class EnhancedTicketView(discord.ui.View):
     payment_emojis = {
         "Paypal": "💳",
         "OXXO": "💸",
-        "Transferencia": "🏦"
+        "Transferencia": "🏦",
+        "Nequi": "💰",
+        "Cripto": "🪙",
+        "Mercado Pago": "📲"
     }
 
     def __init__(self, user_id: str, product_id: Optional[str] = None, product_name: Optional[str] = None):
@@ -82,7 +85,34 @@ class EnhancedTicketView(discord.ui.View):
         self.payment_method = "Transferencia"
         await interaction.response.edit_message(embed=self.create_confirmation_embed(), view=self)
 
-    @discord.ui.button(label="✅ Confirmar", style=discord.ButtonStyle.success, row=1)
+    @discord.ui.button(label="💰 Nequi", style=discord.ButtonStyle.secondary, row=1)
+    async def nequi_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not check_user_permissions(interaction.user.id, self.user_id):
+            await handle_interaction_response(interaction, "No puedes usar este botón.")
+            return
+
+        self.payment_method = "Nequi"
+        await interaction.response.edit_message(embed=self.create_confirmation_embed(), view=self)
+
+    @discord.ui.button(label="🪙 Cripto", style=discord.ButtonStyle.secondary, row=1)
+    async def crypto_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not check_user_permissions(interaction.user.id, self.user_id):
+            await handle_interaction_response(interaction, "No puedes usar este botón.")
+            return
+
+        self.payment_method = "Crypto"
+        await interaction.response.edit_message(embed=self.create_confirmation_embed(), view=self)
+
+    @discord.ui.button(label="📲 Mercado Pago", style=discord.ButtonStyle.secondary, row=0)
+    async def mercado_pago_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not check_user_permissions(interaction.user.id, self.user_id):
+            await handle_interaction_response(interaction, "No puedes usar este botón.")
+            return
+
+        self.payment_method = "Mercado Pago"
+        await interaction.response.edit_message(embed=self.create_confirmation_embed(), view=self)
+
+    @discord.ui.button(label="✅ Confirmar", style=discord.ButtonStyle.success, row=2)
     async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not check_user_permissions(interaction.user.id, self.user_id):
             await handle_interaction_response(interaction, "No puedes usar este botón.")
@@ -203,7 +233,7 @@ class EnhancedTicketView(discord.ui.View):
         
         self.stop()
 
-    @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.danger, row=1)
+    @discord.ui.button(label="❌ Cancelar", style=discord.ButtonStyle.danger, row=2)
     async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not check_user_permissions(interaction.user.id, self.user_id):
             await handle_interaction_response(interaction, "No puedes usar este botón.")

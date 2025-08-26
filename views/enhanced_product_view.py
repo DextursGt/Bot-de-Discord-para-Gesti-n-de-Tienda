@@ -1,5 +1,6 @@
 import discord
 from typing import List, Dict, Tuple
+from exchange_rate_manager import ExchangeRateManager
 
 class EnhancedProductView(discord.ui.View):
     def __init__(self, products: List[Tuple[str, Dict]], pages: List[List], current_page: int = 0):
@@ -9,9 +10,12 @@ class EnhancedProductView(discord.ui.View):
         self.current_page = current_page
         self.selected_product = None
         self.selected_category = None
+        self.selected_country = "mexico"  # País por defecto
         self.categories = self._get_categories()
+        self.exchange_manager = ExchangeRateManager()
         self.update_buttons()
         self._setup_category_select()
+        self._setup_country_select()
 
     def _get_categories(self) -> List[str]:
         # Obtener todas las categorías del sistema
@@ -25,10 +29,13 @@ class EnhancedProductView(discord.ui.View):
         
         return sorted(categories)
 
-    def create_embed(self) -> discord.Embed:
+    async def create_embed(self) -> discord.Embed:
+        country_info = self.exchange_manager.get_country_info()
+        current_country = country_info.get(self.selected_country, country_info["mexico"])
+        
         embed = discord.Embed(
             title="🛍️ Catálogo de Productos",
-            description="Explora nuestros productos por categoría\n\n**Comprar:** Usa '🛒 Seleccionar' para elegir un producto",
+            description=f"Explora nuestros productos por categoría\n🌎 **País:** {current_country['name']}\n💱 **Moneda:** {current_country['currency']}\n\n**Comprar:** Usa '🛒 Seleccionar' para elegir un producto",
             color=0xA100F2
         )
 
@@ -75,19 +82,32 @@ class EnhancedProductView(discord.ui.View):
             )
 
             for product_id, product in products:
-                price = product.get('price', 0)
+                price_mxn = product.get('price', 0)
                 name = product.get('name', 'Producto sin nombre')
                 description = product.get('description', 'Sin descripción')
+                
+                # Convertir precio a moneda local
+                country_info = self.exchange_manager.get_country_info()
+                currency_code = country_info[self.selected_country]['currency']
+                local_price = await self.exchange_manager.convert_price(price_mxn, currency_code)
+                currency_symbol = country_info[self.selected_country]['currency_symbol']
+
+                # Mostrar precio según el país seleccionado
+                if self.selected_country == "mexico":
+                    price_display = f"💰 {currency_symbol}{price_mxn:.2f} MXN"
+                else:
+                    price_display = f"💰 ${price_mxn:.2f} MXN ({currency_symbol}{local_price:.2f} {currency_code})"
 
                 embed.add_field(
                     name=name,
-                    value=f"💰 ${price:.2f} MXN\n"
+                    value=f"{price_display}\n"
                           f"📝 {description[:100]}{'...' if len(description) > 100 else ''}",
                     inline=True
                 )
 
         embed.set_footer(text=f"Página {self.current_page + 1}/{len(self.pages)} • "
-                             f"Categoría: {self.selected_category or 'Todas'}")
+                             f"Categoría: {self.selected_category or 'Todas'} • "
+                             f"País: {self.selected_country}")
         return embed
 
     def update_buttons(self):
@@ -99,13 +119,15 @@ class EnhancedProductView(discord.ui.View):
     async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = max(0, self.current_page - 1)
         self.update_buttons()
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
+        embed = await self.create_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
 
     @discord.ui.button(label="➡️", style=discord.ButtonStyle.gray, row=0)
     async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page = min(len(self.pages) - 1, self.current_page + 1)
         self.update_buttons()
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
+        embed = await self.create_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
 
     def _setup_category_select(self):
         select = discord.ui.Select(
@@ -124,9 +146,30 @@ class EnhancedProductView(discord.ui.View):
         self.selected_category = None if selected == "all" else selected
         self.current_page = 0
         self.update_buttons()
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
+        embed = await self.create_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="🛒 Seleccionar", style=discord.ButtonStyle.success, row=2)
+    def _setup_country_select(self):
+        select = discord.ui.Select(
+            placeholder="Selecciona un país",
+            min_values=1,
+            max_values=1,
+            options=[
+                discord.SelectOption(label="🇲🇽 México", value="mexico"),
+                discord.SelectOption(label="🇦🇷 Argentina", value="argentina"),
+                discord.SelectOption(label="🇨🇴 Colombia", value="colombia")
+            ],
+            row=2
+        )
+        select.callback = self.select_country_callback
+        self.add_item(select)
+
+    async def select_country_callback(self, interaction: discord.Interaction):
+        self.selected_country = interaction.data['values'][0]
+        embed = await self.create_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="🛒 Seleccionar", style=discord.ButtonStyle.success, row=3)
     async def select_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Obtener productos de la página actual
         current_page_products = self.pages[self.current_page]
@@ -136,18 +179,31 @@ class EnhancedProductView(discord.ui.View):
         else:
             filtered_products = current_page_products
 
-        # Crear menú de selección
+        # Crear menú de selección con precios convertidos
+        options = []
+        for pid, prod in filtered_products:
+            price_mxn = prod['price']
+            country_info = self.exchange_manager.get_country_info()
+            currency_code = country_info[self.selected_country]['currency']
+            local_price = await self.exchange_manager.convert_price(price_mxn, currency_code)
+            currency_symbol = country_info[self.selected_country]['currency_symbol']
+            
+            if self.selected_country == "mexico":
+                price_label = f"{currency_symbol}{price_mxn:.2f} MXN"
+            else:
+                price_label = f"${price_mxn:.2f} MXN ({currency_symbol}{local_price:.2f} {currency_code})"
+            
+            options.append(discord.SelectOption(
+                label=f"{prod['name']} - {price_label}",
+                value=pid,
+                description=prod.get('description', 'Sin descripción')[:100]
+            ))
+        
         select = discord.ui.Select(
             placeholder="Selecciona un producto",
             min_values=1,
             max_values=1,
-            options=[
-                discord.SelectOption(
-                    label=f"{prod['name']} - ${prod['price']:.2f} MXN",
-                    value=pid,
-                    description=prod.get('description', 'Sin descripción')[:100]
-                ) for pid, prod in filtered_products
-            ]
+            options=options
         )
 
         async def select_callback(interaction: discord.Interaction):

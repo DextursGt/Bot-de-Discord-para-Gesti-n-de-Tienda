@@ -15,6 +15,7 @@ from data_manager import (load_data, save_data, get_next_ticket_id,
 from views.enhanced_product_view import EnhancedProductView
 from views.enhanced_ticket_view import EnhancedTicketView
 from views.shop_view import ShopView
+from exchange_rate_manager import exchange_rate_manager
 from utils import sync_fortnite_shop, cache_fortnite_shop
 from config import (TICKET_CHANNEL_ID, OWNER_ROLE_ID, FORTNITE_API_KEY, FORTNITE_API_URL, 
                    FORTNITE_HEADERS, ROBLOX_GROUP_ID, ROBLOX_API_BASE, ROBLOX_GROUPS_API)
@@ -37,30 +38,36 @@ def calculate_days_since_creation(created_date: str):
         return 0
 
 def setup(tree: app_commands.CommandTree, client: discord.Client):
-    @tree.command(name="products", description="Ver todos los productos disponibles")
+    @tree.command(name="products", description="Ver productos virtuales con conversión de moneda por país")
     async def products(interaction: discord.Interaction):
         try:
+            await interaction.response.defer(ephemeral=True)
             data = load_data()
-            products = list(data["products"].items())
-            items_per_page = 24
-            pages = [products[i:i + items_per_page] for i in range(0, len(products), items_per_page)] if products else [[]]
             
+            if not data["products"]:
+                await interaction.followup.send("No hay productos disponibles. Contacta a un Owner.", ephemeral=True)
+                return
+            
+            # Mostrar productos con vista mejorada que incluye selección de país
+            items_per_page = 24
+            products = list(data["products"].items())
+            pages = [products[i:i + items_per_page] for i in range(0, len(products), items_per_page)]
             view = EnhancedProductView(products, pages)
-            if not interaction.response.is_done():
-                await interaction.response.send_message(embed=view.create_embed(), view=view, ephemeral=True)
+            embed = await view.create_embed()
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            
         except discord.NotFound:
             # Interacción expirada, no hacer nada
             print(f"Interacción de products expirada para usuario {interaction.user.id}")
         except Exception as e:
             print(f"Error en comando products: {e}")
-            if not interaction.response.is_done():
-                try:
-                    await interaction.response.send_message(
-                        "❌ Ha ocurrido un error. Inténtalo de nuevo.",
-                        ephemeral=True
-                    )
-                except:
-                    pass
+            try:
+                await interaction.followup.send(
+                    "❌ Ha ocurrido un error. Inténtalo de nuevo.",
+                    ephemeral=True
+                )
+            except:
+                pass
 
     @tree.command(name="ticket", description="Abre un ticket para comprar un producto")
     async def ticket(interaction: discord.Interaction):
@@ -85,7 +92,7 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
         products = list(data["products"].items())
         pages = [products[i:i + items_per_page] for i in range(0, len(products), items_per_page)]
         view = EnhancedProductView(products, pages)
-        embed = view.create_embed()
+        embed = await view.create_embed()
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @tree.command(name="ver_tienda", description="Muestra los regalos disponibles de la tienda de Fortnite")
@@ -135,6 +142,90 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
         except Exception as e:
             print(f"Error en el comando ver_tienda: {str(e)}")
             await interaction.followup.send("Ocurrió un error al mostrar la tienda. Por favor, intenta más tarde.", ephemeral=True)
+
+    @tree.command(name="exchange_rates", description="Ver información sobre las tasas de cambio actuales")
+    async def exchange_rates(interaction: discord.Interaction):
+        """Comando para mostrar información sobre las tasas de cambio"""
+        try:
+            await interaction.response.defer()
+            
+            # Obtener información de tasas de cambio
+            rate_info = await exchange_rate_manager.get_rate_info()
+            rates = await exchange_rate_manager.get_exchange_rates()
+            
+            embed = discord.Embed(
+                title="💱 Tasas de Cambio Actuales",
+                description="Información sobre las tasas de conversión MXN a monedas locales",
+                color=0x00ff00
+            )
+            
+            # Información general
+            embed.add_field(
+                name="📊 Estado del Sistema",
+                value=(
+                    f"**Última actualización:** {rate_info['last_updated']}\n"
+                    f"**Fuente:** {rate_info['source']}\n"
+                    f"**Estado:** {'✅ Caché activo' if rate_info['is_cached'] else '⚠️ Tasas predeterminadas'}"
+                ),
+                inline=False
+            )
+            
+            # Tasas por país
+            countries = exchange_rate_manager.get_country_info()
+            
+            for country_key, country_info in countries.items():
+                currency = country_info['currency']
+                
+                if currency == "MXN":
+                    # Para México, no hay conversión
+                    value_text = (
+                        f"**Moneda base:** MXN\n"
+                        f"**Ejemplos:**\n"
+                        f"• $100 MXN = $100.00 MXN\n"
+                        f"• $500 MXN = $500.00 MXN"
+                    )
+                else:
+                    rate = rates.get(currency, 'N/A')
+                    
+                    if isinstance(rate, (int, float)):
+                         # Ejemplos de conversión desde MXN
+                         example_100 = await exchange_rate_manager.convert_price(100, currency)
+                         example_500 = await exchange_rate_manager.convert_price(500, currency)
+                         
+                         value_text = (
+                             f"**Tasa:** 1 MXN = {rate:.2f} {currency}\n"
+                             f"**Ejemplos:**\n"
+                             f"• $100 MXN = {country_info['currency_symbol']}{example_100:,.2f}\n"
+                             f"• $500 MXN = {country_info['currency_symbol']}{example_500:,.2f}"
+                         )
+                    else:
+                        value_text = f"**Tasa:** No disponible\n**Estado:** Error al obtener tasa"
+                
+                embed.add_field(
+                    name=f"{country_info['flag']} {country_info['name']}",
+                    value=value_text,
+                    inline=True
+                )
+            
+            # Nota sobre conversión
+            embed.add_field(
+                name="💰 Información de Precios",
+                value="Todos los precios están en MXN y se convierten automáticamente a la moneda local según el país seleccionado",
+                inline=False
+            )
+            
+            embed.set_footer(text="Las tasas se actualizan automáticamente cada hora")
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Error en comando exchange_rates: {e}")
+            embed = discord.Embed(
+                title="❌ Error",
+                description="Ocurrió un error al obtener las tasas de cambio.",
+                color=0xff0000
+            )
+            await interaction.followup.send(embed=embed)
 
     # Funciones auxiliares para Roblox API
     async def get_roblox_user_info(username: str):

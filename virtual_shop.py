@@ -1,3 +1,4 @@
+# Importamos todo lo que necesitamos para que funcione nuestra tienda virtual
 import json
 import uuid
 from datetime import datetime
@@ -6,36 +7,42 @@ from data_manager import load_data, save_data
 from economy_system import economy
 
 class VirtualShop:
+    """Esta es nuestra tienda virtual donde los usuarios pueden comprar cosas geniales"""
+    
     def __init__(self):
+        """Aquí definimos todas las categorías disponibles en nuestra tienda"""
         self.categories = {
-            "roles": {"name": "Roles", "emoji": "🎭"},
-            "perks": {"name": "Beneficios", "emoji": "⭐"},
-            "items": {"name": "Items", "emoji": "🎁"},
-            "cosmetics": {"name": "Cosméticos", "emoji": "✨"},
-            "other": {"name": "Otros", "emoji": "📦"}
+            "roles": {"name": "Roles", "emoji": "🎭"},      # Roles especiales para el servidor
+            "perks": {"name": "Beneficios", "emoji": "⭐"},  # Ventajas y beneficios únicos
+            "items": {"name": "Items", "emoji": "🎁"},      # Objetos y artículos virtuales
+            "cosmetics": {"name": "Cosméticos", "emoji": "✨"}, # Para verse más cool
+            "other": {"name": "Otros", "emoji": "📦"}       # Todo lo demás que no encaja
         }
     
     def get_virtual_products(self) -> Dict:
-        """Obtiene todos los productos virtuales"""
+        """Trae todos los productos que tenemos disponibles en la tienda"""
         data = load_data()
+        
+        # Si es la primera vez, creamos la estructura de la tienda
         if "virtual_shop" not in data:
             data["virtual_shop"] = {
-                "products": {},
-                "purchases": {},
-                "settings": {"enabled": True, "tax_rate": 0.0}
+                "products": {},    # Aquí guardamos todos los productos
+                "purchases": {},   # Aquí las compras de los usuarios
+                "settings": {"enabled": True, "tax_rate": 0.0}  # Configuración general
             }
             save_data(data)
         
         products = data["virtual_shop"]["products"]
         
-        # Verificar si products es una lista, convertir a diccionario
+        # A veces los datos pueden estar en formato incorrecto, los arreglamos
         if isinstance(products, list):
+            # Si está como lista, lo convertimos a diccionario
             products_dict = {str(i): product for i, product in enumerate(products)}
             data["virtual_shop"]["products"] = products_dict
             save_data(data)
             return products_dict
         elif not isinstance(products, dict):
-            # Si no es ni lista ni diccionario, inicializar como diccionario vacío
+            # Si no es ni lista ni diccionario, empezamos de cero
             data["virtual_shop"]["products"] = {}
             save_data(data)
             return {}
@@ -45,109 +52,117 @@ class VirtualShop:
     def add_virtual_product(self, name: str, price: int, description: str, 
                            category: str = "other", image_url: str = None,
                            role_id: str = None, duration_days: int = None) -> str:
-        """Añade un producto virtual a la tienda"""
+        """Agrega un nuevo producto genial a nuestra tienda virtual"""
         data = load_data()
         
+        # Si no existe la tienda, la creamos desde cero
         if "virtual_shop" not in data:
             data["virtual_shop"] = {"products": {}, "purchases": {}, "settings": {"enabled": True, "tax_rate": 0.0}}
         
+        # Generamos un ID único para el producto (como una huella digital)
         product_id = str(uuid.uuid4())
         
+        # Creamos toda la información del producto
         product_data = {
-            "id": product_id,
-            "name": name,
-            "price": price,
-            "description": description,
-            "category": category,
-            "image_url": image_url,
-            "role_id": role_id,
-            "duration_days": duration_days,
-            "created_at": datetime.utcnow().isoformat(),
-            "enabled": True,
-            "purchases_count": 0
+            "id": product_id,              # Su identificador único
+            "name": name,                  # Nombre que verán los usuarios
+            "price": price,                # Cuánto cuesta en GameCoins
+            "description": description,    # Descripción atractiva
+            "category": category,          # En qué categoría va
+            "image_url": image_url,        # Imagen para que se vea bonito
+            "role_id": role_id,            # Si da un rol especial
+            "duration_days": duration_days, # Si es temporal, cuántos días dura
+            "created_at": datetime.utcnow().isoformat(), # Cuándo lo creamos
+            "enabled": True,               # Si está disponible para comprar
+            "purchases_count": 0           # Cuántas veces lo han comprado
         }
         
+        # Guardamos el producto en nuestra base de datos
         data["virtual_shop"]["products"][product_id] = product_data
         save_data(data)
         
-        return product_id
+        return product_id  # Devolvemos el ID para referencia
     
     def remove_virtual_product(self, product_id: str) -> bool:
-        """Elimina un producto virtual"""
+        """Elimina un producto de la tienda (¡cuidado, no se puede deshacer!)"""
         data = load_data()
         
+        # Verificamos que el producto existe antes de eliminarlo
         if "virtual_shop" in data and product_id in data["virtual_shop"]["products"]:
-            del data["virtual_shop"]["products"][product_id]
+            del data["virtual_shop"]["products"][product_id]  # ¡Adiós producto!
             save_data(data)
-            return True
-        return False
+            return True  # Éxito, producto eliminado
+        return False  # No se pudo eliminar (probablemente no existía)
     
     def edit_virtual_product(self, product_id: str, **kwargs) -> bool:
-        """Edita un producto virtual"""
+        """Modifica un producto existente (para cuando queremos cambiar algo)"""
         data = load_data()
         
+        # Verificamos que el producto existe
         if "virtual_shop" in data and product_id in data["virtual_shop"]["products"]:
             product = data["virtual_shop"]["products"][product_id]
             
-            # Actualizar campos permitidos
+            # Solo permitimos cambiar ciertos campos por seguridad
             allowed_fields = ['name', 'price', 'description', 'category', 'image_url', 
                             'role_id', 'duration_days', 'enabled']
             
+            # Actualizamos solo los campos que nos enviaron y que están permitidos
             for field, value in kwargs.items():
                 if field in allowed_fields and value is not None:
-                    product[field] = value
+                    product[field] = value  # Aplicamos el cambio
             
-            save_data(data)
-            return True
-        return False
+            save_data(data)  # Guardamos los cambios
+            return True  # Todo salió bien
+        return False  # El producto no existe
     
     def purchase_virtual_product(self, user_id: str, product_id: str) -> Dict[str, Any]:
-        """Procesa la compra de un producto virtual"""
+        """¡Aquí es donde la magia sucede! Procesamos la compra de un producto"""
         data = load_data()
         
-        # Verificar que el producto existe
+        # Primero verificamos que el producto realmente existe
         if "virtual_shop" not in data or product_id not in data["virtual_shop"]["products"]:
-            return {"success": False, "message": "Producto no encontrado"}
+            return {"success": False, "message": "¡Ups! Ese producto no existe 😅"}
         
         product = data["virtual_shop"]["products"][product_id]
         
-        # Verificar que el producto está habilitado
+        # Verificamos que el producto esté disponible para comprar
         if not product.get("enabled", True):
-            return {"success": False, "message": "Producto no disponible"}
+            return {"success": False, "message": "Este producto no está disponible ahora mismo 😔"}
         
-        # Verificar balance del usuario
+        # ¡Momento de la verdad! ¿Tiene suficiente dinero?
         user_balance = economy.get_balance(user_id)
         if user_balance < product["price"]:
             return {
                 "success": False, 
-                "message": f"Saldo insuficiente. Necesitas {product['price']:,} GameCoins, tienes {user_balance:,}"
+                "message": f"¡Te faltan monedas! Necesitas {product['price']:,} GameCoins, pero solo tienes {user_balance:,} 💰"
             }
         
-        # Procesar la compra
+        # ¡Perfecto! Vamos a procesar la compra
         try:
-            # Deducir GameCoins
+            # Le quitamos las monedas de su cuenta
             economy.remove_coins(user_id, product["price"])
             
-            # Registrar la compra
-            purchase_id = str(uuid.uuid4())
+            # Creamos un registro de la compra para el historial
+            purchase_id = str(uuid.uuid4())  # ID único para esta compra
             purchase_data = {
-                "id": purchase_id,
-                "user_id": user_id,
-                "product_id": product_id,
-                "product_name": product["name"],
-                "price_paid": product["price"],
-                "purchased_at": datetime.utcnow().isoformat(),
-                "active": True
+                "id": purchase_id,                              # Identificador único
+                "user_id": user_id,                            # Quién lo compró
+                "product_id": product_id,                      # Qué compró
+                "product_name": product["name"],               # Nombre del producto
+                "price_paid": product["price"],                # Cuánto pagó
+                "purchased_at": datetime.utcnow().isoformat(), # Cuándo lo compró
+                "active": True                                 # Si está activo
             }
             
+            # Nos aseguramos de que existe la sección de compras
             if "purchases" not in data["virtual_shop"]:
                 data["virtual_shop"]["purchases"] = {}
             data["virtual_shop"]["purchases"][purchase_id] = purchase_data
             
-            # Incrementar contador de compras del producto
+            # Aumentamos el contador de cuántas veces se ha comprado este producto
             data["virtual_shop"]["products"][product_id]["purchases_count"] += 1
             
-            save_data(data)
+            save_data(data)  # Guardamos todo
             
             return {
                 "success": True,

@@ -1,3 +1,4 @@
+# Importamos todas las librerías que necesitamos para que funcione la economía
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -5,44 +6,53 @@ import asyncio
 from datetime import datetime, timedelta
 from economy_system import economy
 
+# Para manejar tipos opcionales y números aleatorios
 from typing import Optional
 import random
+# Aquí traemos las vistas de nuestra tienda virtual
 from views.virtual_shop_view import VirtualShopView, MyPurchasesView
 
 def setup(tree: app_commands.CommandTree, client: discord.Client):
     
     @tree.command(name="balance", description="🪙 Muestra tu balance de GameCoins")
     async def balance(interaction: discord.Interaction, usuario: Optional[discord.Member] = None):
+        # Si no especifican usuario, mostramos el balance de quien usa el comando
         target_user = usuario or interaction.user
-        # Forzar recarga de datos frescos
+        # Cargamos los datos más frescos de la base de datos
         from data_manager import load_data
         data = load_data()
         if "economy" in data and "users" in data["economy"] and str(target_user.id) in data["economy"]["users"]:
             user_economy = data["economy"]["users"][str(target_user.id)]
         else:
+            # Si no existe en los datos, creamos un perfil nuevo
             user_economy = economy.get_user_economy(str(target_user.id))
         
+        # Creamos un embed bonito con toda la información del usuario
         embed = discord.Embed(
             title=f"💰 Balance de {target_user.display_name}",
-            color=0x00ff00
+            color=0x00ff00  # Verde porque el dinero es verde 💚
         )
         
+        # Mostramos cuántas monedas tiene actualmente
         embed.add_field(
             name="🪙 GameCoins", 
             value=f"`{user_economy['coins']:,}`", 
             inline=True
         )
+        # Su nivel actual en el servidor
         embed.add_field(
             name="📊 Nivel", 
             value=f"`{user_economy['level']}`", 
             inline=True
         )
+        # Puntos de experiencia acumulados
         embed.add_field(
             name="⭐ XP", 
             value=f"`{user_economy['xp']:,}`", 
             inline=True
         )
         
+        # Estadísticas para presumir
         embed.add_field(
             name="💎 Total Ganado", 
             value=f"`{user_economy['total_earned']:,}`", 
@@ -53,12 +63,14 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
             value=f"`{user_economy['total_spent']:,}`", 
             inline=True
         )
+        # Qué tan bueno es en los juegos
         embed.add_field(
             name="🎮 Juegos Ganados", 
             value=f"`{user_economy['games_won']}/{user_economy['games_played']}`", 
             inline=True
         )
         
+        # Si tiene trabajo, lo mostramos
         if user_economy.get('job'):
             job_info = economy.jobs.get(user_economy['job'])
             if job_info:
@@ -68,7 +80,7 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
                     inline=False
                 )
         
-        # Obtener ranking
+        # Vamos a ver en qué posición está en el ranking
         rank = economy.get_user_rank(str(target_user.id), "coins")
         if rank:
             embed.add_field(
@@ -77,6 +89,7 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
                 inline=True
             )
         
+        # Ponemos su avatar para que se vea más personal
         embed.set_thumbnail(url=target_user.display_avatar.url)
         embed.set_footer(text="GameMid Economy System")
         
@@ -84,42 +97,48 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
     
     @tree.command(name="daily", description="📅 Muestra y reclama tus tareas diarias")
     async def daily(interaction: discord.Interaction):
+        """Comando para que los usuarios vean y reclamen sus tareas diarias"""
         user_id = str(interaction.user.id)
         daily_tasks = economy.get_daily_tasks(user_id)
         
+        # Creamos un embed bonito para mostrar las tareas
         embed = discord.Embed(
             title="📅 Tareas Diarias",
-            description="Completa estas tareas para ganar GameCoins extra!",
-            color=0x3498db
+            description="¡Completa estas tareas para ganar GameCoins extra! 💰",
+            color=0x3498db  # Azul como el cielo de un nuevo día
         )
         
+        # Contadores para ver cuánto puede ganar en total
         total_possible = 0
         total_claimed = 0
         
+        # Revisamos cada tarea disponible
         for task_id, task_data in daily_tasks.items():
             if task_id in economy.daily_tasks:
                 task_info = economy.daily_tasks[task_id]
-                progress = task_data['progress']
-                target = task_info['target']
-                reward = task_info['reward']
+                progress = task_data['progress']  # Cuánto ha avanzado
+                target = task_info['target']      # Cuánto necesita completar
+                reward = task_info['reward']      # Cuánto va a ganar
                 
                 total_possible += reward
                 
-                # Determinar estado
+                # Vemos en qué estado está la tarea
                 if task_data['claimed']:
-                    status = "✅ Reclamada"
+                    status = "✅ Ya reclamada"
                     total_claimed += reward
                 elif task_data['completed']:
-                    status = "🎁 Lista para reclamar"
+                    status = "🎁 ¡Lista para reclamar!"
                 else:
-                    status = f"📊 {progress}/{target}"
+                    status = f"📊 {progress}/{target}"  # Muestra el progreso actual
                 
+                # Agregamos cada tarea al embed
                 embed.add_field(
                     name=f"{task_info['name']} - {reward} 🪙",
                     value=status,
                     inline=False
                 )
         
+        # Mostramos un resumen de cuánto ha ganado
         embed.add_field(
             name="💰 Progreso Total",
             value=f"{total_claimed}/{total_possible} GameCoins reclamados",
@@ -133,18 +152,22 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
     @tree.command(name="claim_task", description="🎁 Reclama la recompensa de una tarea completada")
     async def claim_task(interaction: discord.Interaction, 
                         tarea: str):
+        """Comando para que los usuarios reclamen sus recompensas de tareas completadas"""
         user_id = str(interaction.user.id)
         task_id = tarea
         
+        # Intentamos reclamar la recompensa
         reward = economy.claim_task_reward(user_id, task_id)
         
         if reward:
+            # ¡Éxito! El usuario ganó monedas
             embed = discord.Embed(
                 title="🎉 ¡Recompensa Reclamada!",
-                description=f"Has ganado **{reward} GameCoins** por completar: {economy.daily_tasks[task_id]['name']}",
-                color=0x00ff00
+                description=f"¡Felicidades! Has ganado **{reward} GameCoins** por completar: {economy.daily_tasks[task_id]['name']}",
+                color=0x00ff00  # Verde de éxito
             )
             
+            # Mostramos su nuevo balance
             user_economy = economy.get_user_economy(user_id)
             embed.add_field(
                 name="💰 Nuevo Balance",
@@ -152,10 +175,11 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
                 inline=True
             )
         else:
+            # Algo salió mal
             embed = discord.Embed(
-                title="❌ Error",
-                description="No puedes reclamar esta tarea. Asegúrate de que esté completada y no reclamada.",
-                color=0xff0000
+                title="❌ Oops, algo salió mal",
+                description="No puedes reclamar esta tarea. Asegúrate de que esté completada y no la hayas reclamado ya.",
+                color=0xff0000  # Rojo de error
             )
         
         await interaction.response.send_message(embed=embed)
