@@ -26,22 +26,7 @@ def setup(tree: app_commands.CommandTree, client: discord.Client):
         embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
         embed.add_field(
             name="🛍️ Ver Productos",
-            value="Usa `/products` para ver todos los productos disponibles.",
-            inline=False
-        )
-        embed.add_field(
-            name="🎫 Crear Ticket",
-            value="Usa `/ticket` para abrir un ticket y realizar una compra.",
-            inline=False
-        )
-        embed.add_field(
-            name="📜 Comandos",
-            value="Usa `/help` para ver todos los comandos disponibles.",
-            inline=False
-        )
-        embed.add_field(
-            name="@AssistantMid",
-            value="Pregúntale tus dudas a Mari!",
+            value="Usa `/products` para ver todos los productos disponibles y realizar una compra",
             inline=False
         )
         embed.set_footer(text=f"ID: {member.id}")

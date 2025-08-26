@@ -40,7 +40,7 @@ async def setup():
 
 @client.event
 async def on_ready():
-    print(f"¡Hola! Soy {client.user} y estoy listo para ayudar")
+    print(f"Activo {client.user} ")
     
     # Le decimos a Discord qué está haciendo nuestro bot
     activity = discord.Activity(type=discord.ActivityType.playing, name="Gestionando Tickets y Productos")
@@ -49,9 +49,9 @@ async def on_ready():
     # Sincronizamos todos los comandos con Discord
     try:
         synced = await tree.sync()
-        print(f"¡Perfecto! He cargado {len(synced)} comandos y están listos para usar ✅")
+        print(f"¡Perfecto! He cargado {len(synced)} comandos ")
     except Exception as e:
-        print(f"Ups, algo salió mal al cargar los comandos: {e}")
+        print(f"Ocurrió un error al sincronizar los comandos: {e}")
     
     # Arrancamos el sistema que recuerda a los usuarios sobre sus Robux
     try:
