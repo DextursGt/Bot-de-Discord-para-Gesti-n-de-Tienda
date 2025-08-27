@@ -157,7 +157,8 @@ class EnhancedProductView(discord.ui.View):
             options=[
                 discord.SelectOption(label="🇲🇽 México", value="mexico"),
                 discord.SelectOption(label="🇦🇷 Argentina", value="argentina"),
-                discord.SelectOption(label="🇨🇴 Colombia", value="colombia")
+                discord.SelectOption(label="🇨🇴 Colombia", value="colombia"),
+                discord.SelectOption(label="🇺🇸 Estados Unidos", value="usa")
             ],
             row=2
         )

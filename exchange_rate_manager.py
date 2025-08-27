@@ -15,7 +15,8 @@ class ExchangeRateManager:
         self.cache_duration = timedelta(hours=1)  # Actualizar cada hora
         self.fallback_rates = {
             "ARS": 72.3,  # 1 MXN = 72.3 ARS
-            "COP": 216.0  # 1 MXN = 216 COP
+            "COP": 216.0,
+            "USD": 0.054 # 
         }
     
     async def get_exchange_rates(self) -> Dict[str, float]:
@@ -60,7 +61,7 @@ class ExchangeRateManager:
             rates = cache_data.get("rates", {})
             
             # Verificar que tenemos todas las monedas necesarias (sin MXN ya que es la base)
-            required_currencies = ["ARS", "COP"]
+            required_currencies = ["ARS", "COP", "USD"]
             if all(currency in rates for currency in required_currencies):
                 return {currency: rates[currency] for currency in required_currencies}
             
@@ -80,7 +81,7 @@ class ExchangeRateManager:
                         rates = data.get("rates", {})
                         
                         # Extraer solo las monedas que necesitamos (sin MXN ya que es la base)
-                        required_currencies = ["ARS", "COP"]
+                        required_currencies = ["ARS", "COP", "USD"]
                         filtered_rates = {}
                         
                         for currency in required_currencies:
@@ -140,6 +141,12 @@ class ExchangeRateManager:
                 "currency": "COP",
                 "currency_symbol": "$",
                 "flag": "🇨🇴"
+            },
+            "usa": {
+                "name": "🇺🇸 Estados Unidos",
+                "currency": "USD",
+                "currency_symbol": "$",
+                "flag": "🇺🇸"
             }
         }
     
