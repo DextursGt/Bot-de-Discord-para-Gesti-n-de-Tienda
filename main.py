@@ -74,8 +74,8 @@ async def main():
     await setup()  
     await client.start(DISCORD_TOKEN)  
 
-# 
+#
 if __name__ == "__main__":
     import asyncio
-    print("Iniciando AssistantMid.")
+    print("Iniciando BOT.")
     asyncio.run(main())
